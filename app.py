@@ -1,63 +1,83 @@
 import streamlit as st
-from datetime import date
-st.set_page_config(page_title="Doctor Handwriting to Kannada Voice", page_icon="💊", layout="wide")
+st.set_page_config(page_title="Doctor Kannada + AI Search", page_icon="💊", layout="wide")
 
 lang = st.sidebar.selectbox("Language / ಭಾಷೆ", ["ಕನ್ನಡ", "English"])
 def t(en, kn): return kn if lang=="ಕನ್ನಡ" else en
 
-st.title(t("Medicine Reader - Your Language", "💊 ಔಷಧಿ ಅರ್ಥಮಾಡಿಕೊಳ್ಳಿ - ನಿಮ್ಮ ಭಾಷೆಯಲ್ಲಿ"))
-st.caption(t("Upload prescription photo, get simple Kannada explanation + voice", "ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಫೋಟೋ ಅಪ್ಲೋಡ್ ಮಾಡಿ, ಸರಳ ಕನ್ನಡ ವಿವರಣೆ + ಧ್ವನಿ ಪಡೆಯಿರಿ"))
+# AI Knowledge Base for common medicines in Karnataka
+MED_KB = {
+    "paracetamol": {"en": "For fever and pain. Reduces fever, safe if 1 tab 6 hours gap, max 4 per day.", "kn": "ಜ್ವರ ಮತ್ತು ನೋವಿಗೆ. ಜ್ವರ ಕಡಿಮೆ ಮಾಡುತ್ತದೆ. 6 ಗಂಟೆ ಅಂತರದಲ್ಲಿ 1 ಮಾತ್ರೆ, ದಿನಕ್ಕೆ 4 ಕ್ಕಿಂತ ಹೆಚ್ಚು ಬೇಡ. ಊಟದ ನಂತರ.", "use": "Fever / ಜ್ವರ"},
+    "dolo": {"en": "Same as Paracetamol 650mg - for fever and body pain.", "kn": "Paracetamol 650mg ನಂತೆಯೇ - ಜ್ವರ ಮತ್ತು ಮೈಕೈ ನೋವಿಗೆ.", "use": "Fever / ಜ್ವರ"},
+    "cetirizine": {"en": "For cold, sneezing, allergy. Makes sleepy, take at night.", "kn": "ಶೀತ, ಸೀನುವಿಕೆ, ಅಲರ್ಜಿಗೆ. ನಿದ್ದೆ ಬರಬಹುದು, ರಾತ್ರಿ ತೆಗೆದುಕೊಳ್ಳಿ.", "use": "Cold Allergy / ಶೀತ ಅಲರ್ಜಿ"},
+    "azithromycin": {"en": "Antibiotic for throat infection. Complete full course, don't stop early.", "kn": "ಗಂಟಲು ಸೋಂಕಿಗೆ ಪ್ರತಿಜೀವಕ. ಪೂರ್ತಿ ಕೋರ್ಸ್ ಮುಗಿಸಿ, ಮಧ್ಯದಲ್ಲಿ ನಿಲ್ಲಿಸಬೇಡಿ.", "use": "Infection / ಸೋಂಕು"},
+    "amoxicillin": {"en": "Antibiotic. Take after food, complete course.", "kn": "ಪ್ರತಿಜೀವಕ. ಊಟದ ನಂತರ ತೆಗೆದುಕೊಳ್ಳಿ, ಕೋರ್ಸ್ ಪೂರ್ತಿ ಮಾಡಿ.", "use": "Infection / ಸೋಂಕು"},
+    "omeprazole": {"en": "For gas, acidity, stomach burning. Take before breakfast.", "kn": "ಗ್ಯಾಸ್, ಆಸಿಡಿಟಿ, ಹೊಟ್ಟೆ ಉರಿಗೆ. ಬೆಳಿಗ್ಗೆ ಉಪಹಾರಕ್ಕಿಂತ ಮೊದಲು.", "use": "Acidity / ಆಸಿಡಿಟಿ"},
+    "metformin": {"en": "For diabetes, controls sugar. Take after food, don't miss.", "kn": "ಮಧುಮೇಹಕ್ಕೆ, ಸಕ್ಕರೆ ನಿಯಂತ್ರಣ. ಊಟದ ನಂತರ, ತಪ್ಪಿಸಬೇಡಿ.", "use": "Diabetes / ಸಕ್ಕರೆ ಕಾಯಿಲೆ"},
+}
+
+st.title(t("💊 Doctor Kannada + AI Search", "💊 ಔಷಧಿ AI ಹುಡುಕಾಟ - ಕನ್ನಡದಲ್ಲಿ"))
+st.caption(t("Upload prescription + AI search any medicine in Kannada", "ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ + ಯಾವುದೇ ಔಷಧಿಯನ್ನು ಕನ್ನಡದಲ್ಲಿ AI ಹುಡುಕಿ"))
 
 if "meds" not in st.session_state:
-    st.session_state.meds = [
-        {"name":"Paracetamol 650mg", "morning":1, "noon":0, "night":1, "days":3, "note":"ಊಟದ ನಂತರ / After food"},
-        {"name":"Cetirizine 10mg", "morning":0, "noon":0, "night":1, "days":2, "note":"ರಾತ್ರಿ ಮಾತ್ರ / Night only"},
-    ]
+    st.session_state.meds = []
 
-tab1, tab2 = st.tabs([t("📸 Add Medicine","📸 ಔಷಧಿ ಸೇರಿಸಿ"), t("📋 My Medicines","📋 ನನ್ನ ಔಷಧಿಗಳು")])
+tab1, tab2, tab3 = st.tabs([t("📸 My Prescription","📸 ನನ್ನ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್"), t("🤖 AI Medicine Search","🤖 AI ಔಷಧಿ ಹುಡುಕಾಟ"), t("📋 My Medicines","📋 ನನ್ನ ಔಷಧಿಗಳು")])
 
 with tab1:
-    st.subheader(t("Add from Prescription", "ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್‌ನಿಂದ ಸೇರಿಸಿ"))
-    img = st.file_uploader(t("Upload prescription photo (optional)", "ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಫೋಟೋ ಅಪ್ಲೋಡ್ ಮಾಡಿ"), type=["jpg","png","jpeg"])
-    if img:
-        st.image(img, caption=t("Prescription preview","ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್"), width=300)
-        st.info(t("Manual entry needed for accuracy - OCR is future upgrade","ನಿಖರತೆಗಾಗಿ ಕೈಯಾರೆ ನಮೂದಿಸಿ - OCR ಮುಂದಿನ ಆವೃತ್ತಿಯಲ್ಲಿ"))
-    
-    with st.form("med_form"):
-        c1,c2 = st.columns(2)
-        name = c1.text_input(t("Medicine Name","ಔಷಧಿ ಹೆಸರು"), placeholder="Paracetamol 650")
-        days = c2.number_input(t("For how many days?","ಎಷ್ಟು ದಿನ?"), 1, 90, 3)
-        st.write(t("When to take? / ಯಾವಾಗ ತೆಗೆದುಕೊಳ್ಳಬೇಕು?",""))
-        cm, cn, cni = st.columns(3)
-        m = cm.number_input(t("Morning - ಬೆಳಿಗ್ಗೆ","ಬೆಳಿಗ್ಗೆ"), 0, 4, 1)
-        n = cn.number_input(t("Afternoon - ಮಧ್ಯಾಹ್ನ","ಮಧ್ಯಾಹ್ನ"), 0, 4, 0)
-        ni = cni.number_input(t("Night - ರಾತ್ರಿ","ರಾತ್ರಿ"), 0, 4, 1)
-        note = st.selectbox(t("Instruction","ಸೂಚನೆ"), ["ಊಟದ ನಂತರ / After food","ಊಟದ ಮೊದಲು / Before food","ಹಾಲಿನೊಂದಿಗೆ ಅಲ್ಲ / Not with milk",""])
-        submit = st.form_submit_button(t("Add Medicine","ಔಷಧಿ ಸೇರಿಸಿ"))
-        if submit and name:
-            st.session_state.meds.append({"name":name,"morning":m,"noon":n,"night":ni,"days":days,"note":note})
-            st.success(t("Added! Check My Medicines tab","ಸೇರಿಸಲಾಗಿದೆ! ನನ್ನ ಔಷಧಿಗಳನ್ನು ನೋಡಿ"))
+    img = st.file_uploader(t("Upload prescription photo","ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಫೋಟೋ"), type=["jpg","png","jpeg"])
+    if img: st.image(img, width=300)
+    with st.form("add"):
+        name = st.text_input(t("Medicine Name","ಔಷಧಿ ಹೆಸರು"), placeholder="Dolo 650")
+        c1,c2,c3 = st.columns(3)
+        m = c1.number_input("🌅 "+t("Morning","ಬೆಳಿಗ್ಗೆ"),0,4,1)
+        n = c2.number_input("☀️ "+t("Noon","ಮಧ್ಯಾಹ್ನ"),0,4,0)
+        ni = c3.number_input("🌙 "+t("Night","ರಾತ್ರಿ"),0,4,1)
+        days = st.number_input(t("Days","ದಿನ"),1,90,3)
+        if st.form_submit_button(t("Add","ಸೇರಿಸಿ")) and name:
+            st.session_state.meds.append({"name":name,"m":m,"n":n,"ni":ni,"days":days})
+            st.success(t("Added","ಸೇರಿಸಲಾಗಿದೆ"))
 
 with tab2:
-    st.subheader(t("Big, Simple Cards for Elders","ಹಿರಿಯರಿಗೆ ದೊಡ್ಡ ಅಕ್ಷರಗಳಲ್ಲಿ"))
-    if not st.session_state.meds:
-        st.warning(t("No medicines added","ಯಾವುದೇ ಔಷಧಿ ಸೇರಿಸಿಲ್ಲ"))
+    st.subheader(t("🤖 AI Search - Ask about any medicine", "🤖 AI ಹುಡುಕಾಟ - ಯಾವುದೇ ಔಷಧಿ ಬಗ್ಗೆ ಕೇಳಿ"))
+    st.write(t("Type medicine name like 'Dolo', 'Cetirizine', 'Metformin'", "ಔಷಧಿ ಹೆಸರು ಬರೆಯಿರಿ: Dolo, Cetirizine, Metformin"))
+    q = st.text_input(t("Search medicine","ಔಷಧಿ ಹುಡುಕಿ"), placeholder="Paracetamol")
+    if st.button(t("🔍 AI Explain","🔍 AI ವಿವರಿಸು")) and q:
+        ql = q.lower().strip()
+        found = None
+        for key in MED_KB:
+            if key in ql or ql in key:
+                found = key; break
+        if found:
+            data = MED_KB[found]
+            st.success(f"**{q.upper()}** - {data['use']}")
+            st.markdown(f"### {t('In Kannada:','ಕನ್ನಡದಲ್ಲಿ:')} {data['kn']}")
+            st.markdown(f"**English:** {data['en']}")
+            # AI-style voice text
+            voice = f"{q} - {data['kn']}"
+            st.code(voice)
+            st.info(t("💡 AI Tip: Always confirm with pharmacist. Don't self-medicate.","💡 AI ಸಲಹೆ: ಫಾರ್ಮಸಿಸ್ಟ್‌ನೊಂದಿಗೆ ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ. ಸ್ವಯಂ ಔಷಧಿ ಬೇಡ."))
+        else:
+            st.warning(t(f"'{q}' not in local AI database. In pro version, this would call AI API for Kannada explanation. For now, add it manually.","ಸ್ಥಳೀಯ ಡೇಟಾಬೇಸ್‌ನಲ್ಲಿ ಇಲ್ಲ. ಪ್ರೊ ಆವೃತ್ತಿಯಲ್ಲಿ AI API ಕನ್ನಡ ವಿವರಣೆ ನೀಡುತ್ತದೆ."))
+            st.write(t("Try: Paracetamol, Dolo, Cetirizine, Azithromycin, Omeprazole, Metformin","ಪ್ರಯತ್ನಿಸಿ: Paracetamol, Dolo, Cetirizine..."))
+    
+    st.markdown("---")
+    st.subheader(t("Popular medicines","ಜನಪ್ರಿಯ ಔಷಧಿಗಳು"))
+    cols = st.columns(3)
+    for i, (k,v) in enumerate(MED_KB.items()):
+        with cols[i%3]:
+            with st.container(border=True):
+                st.write(f"**{k.title()}**")
+                st.caption(v['use'])
+                if st.button(t("Explain","ವಿವರಿಸು"), key=f"kb_{k}"):
+                    st.session_state['last_q'] = k
+                    st.rerun()
+
+with tab3:
     for i, med in enumerate(st.session_state.meds):
         with st.container(border=True):
-            st.markdown(f"## 💊 {med['name']}")
-            c1,c2,c3 = st.columns(3)
-            c1.metric("🌅 " + t("Morning","ಬೆಳಿಗ್ಗೆ"), f"{med['morning']} ಮಾತ್ರೆ" if lang=="ಕನ್ನಡ" else f"{med['morning']} tab")
-            c2.metric("☀️ " + t("Afternoon","ಮಧ್ಯಾಹ್ನ"), f"{med['noon']} ಮಾತ್ರೆ" if lang=="ಕನ್ನಡ" else f"{med['noon']} tab")
-            c3.metric("🌙 " + t("Night","ರಾತ್ರಿ"), f"{med['night']} ಮಾತ್ರೆ" if lang=="ಕನ್ನಡ" else f"{med['night']} tab")
-            st.info(f"📅 {med['days']} {t('days','ದಿನ')} | 📝 {med['note']}")
-            # Kannada voice instruction text
-            voice_text = f"{med['name']}. {med['morning']} ಮಾತ್ರೆ ಬೆಳಿಗ್ಗೆ, {med['night']} ಮಾತ್ರೆ ರಾತ್ರಿ, {med['days']} ದಿನ. {med['note']}"
-            st.code(voice_text, language=None)
-            st.caption(t("Press speaker button on phone to hear (browser TTS)","ಫೋನ್‌ನಲ್ಲಿ ಸ್ಪೀಕರ್ ಬಟನ್ ಒತ್ತಿ ಕೇಳಿ"))
-            if st.button(t(f"Remove {med['name']}","ತೆಗೆದುಹಾಕಿ"), key=f"del{i}"):
-                st.session_state.meds.pop(i)
-                st.rerun()
+            st.markdown(f"### {med['name']} - {med['days']} {t('days','ದಿನ')}")
+            st.write(f"🌅 {med['m']} | ☀️ {med['n']} | 🌙 {med['ni']}")
+            if st.button(t("Remove","ತೆಗೆದುಹಾಕಿ"), key=f"r{i}"):
+                st.session_state.meds.pop(i); st.rerun()
 
-st.sidebar.markdown("---")
-st.sidebar.write(t("**Safety:** Always confirm with pharmacist. This is helper, not doctor.","**ಸುರಕ್ಷತೆ:** ಯಾವಾಗಲೂ ಫಾರ್ಮಸಿಸ್ಟ್‌ನೊಂದಿಗೆ ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ."))
-st.sidebar.write("Built by Bharath Gowda | For Karnataka Elders")
+st.sidebar.info("AI Search uses local KB now, can connect to OpenAI/Gemini later | Built by Bharath Gowda")
